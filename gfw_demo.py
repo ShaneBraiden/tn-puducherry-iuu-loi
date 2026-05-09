@@ -178,7 +178,7 @@ def plot(df: pd.DataFrame, artisanal: gpd.GeoSeries) -> None:
     ax.add_feature(
         cfeature.NaturalEarthFeature(
             "physical", "land", "10m",
-            edgecolor="black", facecolor="#dcdcdc",
+            edgecolor="black", facecolor="#a89060",
         ),
         zorder=2,
     )
@@ -237,14 +237,17 @@ def plot(df: pd.DataFrame, artisanal: gpd.GeoSeries) -> None:
     # Add city markers (lon, lat) and labels
     cities = {
         "Chennai": (80.2707, 13.0827),
+        "Mahabalipuram": (80.1927, 12.6208),
         "Puducherry": (79.8145, 11.9139),
     }
     for name, (clon, clat) in cities.items():
         ax.plot(clon, clat, marker="o", color="black", markersize=5,
-                transform=ccrs.PlateCarree(), zorder=8)
-        ax.text(clon + 0.06, clat + 0.06, name, fontsize=8,
-                transform=ccrs.PlateCarree(), zorder=8,
-                bbox=dict(facecolor="white", alpha=0.6, linewidth=0, pad=1))
+                markeredgecolor="white", markeredgewidth=0.8,
+                transform=ccrs.PlateCarree(), zorder=9)
+        ax.text(clon - 0.04, clat + 0.04, name, fontsize=8, fontweight="bold",
+                ha="right", va="bottom",
+                transform=ccrs.PlateCarree(), zorder=10,
+                bbox=dict(facecolor="white", alpha=0.7, linewidth=0, pad=1.2))
 
     ax.add_feature(
         cfeature.NaturalEarthFeature("physical", "coastline", "10m"),

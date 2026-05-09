@@ -190,7 +190,7 @@ def plot_dashboard(
     )
     ax_map.add_feature(
         cfeature.NaturalEarthFeature(
-            "physical", "land", "10m", edgecolor="black", facecolor="#dcdcdc"
+            "physical", "land", "10m", edgecolor="black", facecolor="#a89060"
         ),
         zorder=2,
     )
@@ -259,6 +259,39 @@ def plot_dashboard(
         linewidth=0.6,
         zorder=4,
     )
+
+    # Place markers and labels for key coastal reference cities
+    cities = {
+        "Chennai": (80.2707, 13.0827),
+        "Mahabalipuram": (80.1927, 12.6208),
+        "Puducherry": (79.8145, 11.9139),
+    }
+    for name, (clon, clat) in cities.items():
+        ax_map.plot(
+            clon,
+            clat,
+            marker="o",
+            color="black",
+            markersize=5,
+            markeredgecolor="white",
+            markeredgewidth=0.8,
+            transform=ccrs.PlateCarree(),
+            zorder=9,
+        )
+        ax_map.text(
+            clon - 0.04,
+            clat + 0.04,
+            name,
+            fontsize=8,
+            fontweight="bold",
+            color="black",
+            ha="right",
+            va="bottom",
+            transform=ccrs.PlateCarree(),
+            zorder=10,
+            bbox=dict(facecolor="white", alpha=0.7, linewidth=0, pad=1.2),
+        )
+
     gl = ax_map.gridlines(draw_labels=True, linewidth=0.3, alpha=0.4)
     gl.top_labels = gl.right_labels = False
     ax_map.set_title("AIS effort + 3 nm zone + top persistent in-zone hotspots")
