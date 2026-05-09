@@ -53,7 +53,8 @@ SPATIAL_RES = "HIGH"
 ARTISANAL_NM = 3
 NM_TO_M = 1852
 
-OUT_DIR = Path(__file__).parent
+OUT_DIR = Path(__file__).parent / "output"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DASHBOARD = OUT_DIR / "poc_ais_dashboard_tn_puducherry.png"
 OUT_HTML = OUT_DIR / "poc_ais_dashboard_tn_puducherry.html"
 OUT_MONTHLY_CSV = OUT_DIR / "poc_monthly_summary_tn_puducherry.csv"
@@ -329,15 +330,21 @@ def plot_dashboard(
     ax_ban = fig.add_subplot(gs[1, 1])
 
     ax_map.set_extent((BBOX[0], BBOX[2], BBOX[1], BBOX[3]), crs=ccrs.PlateCarree())
+    
+    # 1. Fill the axis background with white
+    ax_map.patch.set_facecolor("#ffffff")
+    
+    # 2. Add ocean as pure white
     ax_map.add_feature(
-        cfeature.NaturalEarthFeature("physical", "ocean", "10m"),
-        facecolor="#f5f9ff",
+        cfeature.OCEAN,
+        facecolor="#ffffff",
         zorder=1,
     )
+    # 3. Add land as light grey explicitly
     ax_map.add_feature(
-        cfeature.NaturalEarthFeature(
-            "physical", "land", "10m", edgecolor="black", facecolor="#dcdcdc"
-        ),
+        cfeature.LAND,
+        facecolor="#e2e2e2",
+        edgecolor="#444444",
         zorder=2,
     )
 

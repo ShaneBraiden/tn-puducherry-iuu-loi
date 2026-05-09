@@ -24,7 +24,10 @@ python gfw_poc_final.py
 ```
 
 ### Outputs of `gfw_poc_final.py`
-Executing the main script yields the following artifacts in root:
+Executing the main script yields the following artifacts in the `output/` directory:
+
+![Spatial and temporal compliance dashboard](output/poc_ais_dashboard_tn_puducherry.png)
+
 - **`poc_ais_dashboard_tn_puducherry.png`**: Spatial and temporal compliance dashboard (matplotlib).
 - **`poc_ais_dashboard_tn_puducherry.html`**: Interactive Folium map with inside/outside effort heat layers.
 - **`poc_monthly_summary_tn_puducherry.csv`**: Monthly quantitative summary and inside-zone proportion metrics.
