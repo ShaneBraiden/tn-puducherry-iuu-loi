@@ -330,21 +330,15 @@ def plot_dashboard(
     ax_ban = fig.add_subplot(gs[1, 1])
 
     ax_map.set_extent((BBOX[0], BBOX[2], BBOX[1], BBOX[3]), crs=ccrs.PlateCarree())
-    
-    # 1. Fill the axis background with white
-    ax_map.patch.set_facecolor("#ffffff")
-    
-    # 2. Add ocean as pure white
     ax_map.add_feature(
-        cfeature.OCEAN,
-        facecolor="#ffffff",
+        cfeature.NaturalEarthFeature("physical", "ocean", "10m"),
+        facecolor="#f5f9ff",
         zorder=1,
     )
-    # 3. Add land as light grey explicitly
     ax_map.add_feature(
-        cfeature.LAND,
-        facecolor="#e2e2e2",
-        edgecolor="#444444",
+        cfeature.NaturalEarthFeature(
+            "physical", "land", "10m", edgecolor="black", facecolor="#dcdcdc"
+        ),
         zorder=2,
     )
 
