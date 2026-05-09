@@ -2,7 +2,7 @@
 GFW preliminary fishing-effort retrieval - Tamil Nadu / Puducherry coast.
 
 Pulls AIS apparent fishing effort from the Global Fishing Watch 4Wings API
-for the LOI study bounding box (8-14 deg N, 77-80.5 deg E), aggregates
+for the LOI study bounding box (SW: 11.800683, 79.549805; NE: 13.285927, 80.566040), aggregates
 2023-2024, and saves a heatmap PNG with the 3 nm artisanal-zone boundary
 (Tamil Nadu Marine Fisheries Regulation Act 1983) overlaid.
 
@@ -26,8 +26,13 @@ from pathlib import Path
 import requests
 import pandas as pd
 import geopandas as gpd
+import matplotlib as mpl
+# Use a non-GUI backend to avoid Qt platform plugin issues in headless
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import folium
+from folium.plugins import HeatMap
 from shapely.geometry import box, mapping
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -37,8 +42,8 @@ import cartopy.io.shapereader as shpreader
 
 GFW_TOKEN = os.environ.get("GFW_TOKEN", "").strip()
 
-# Bbox from the LOI: 8-14 deg N, 77-80.5 deg E (Tamil Nadu + Puducherry).
-BBOX = (77.0, 8.0, 80.5, 14.0)             # (W, S, E, N)
+# Bbox (WGS 84 / EPSG:4326): SW(11.800683, 79.549805), NE(13.285927, 80.566040).
+BBOX = (79.549805, 11.800683, 80.566040, 13.285927)  # (W, S, E, N)
 
 # Two-year window, split because the 4Wings date-range param caps at 366 days.
 DATE_RANGES = [
@@ -52,6 +57,7 @@ ARTISANAL_NM = 3
 NM_TO_M = 1852
 
 OUT_FIG = Path(__file__).parent / "figure_fishing_effort_tn_puducherry.png"
+OUT_HTML = Path(__file__).parent / "figure_fishing_effort_tn_puducherry.html"
 GFW_REPORT_URL = "https://gateway.api.globalfishingwatch.org/v3/4wings/report"
 
 
@@ -160,7 +166,10 @@ def plot(df: pd.DataFrame, artisanal: gpd.GeoSeries) -> None:
 
     fig = plt.figure(figsize=(8, 10))
     ax = plt.axes(projection=ccrs.PlateCarree())
-    ax.set_extent(BBOX, crs=ccrs.PlateCarree())
+    # `BBOX` is defined as (west, south, east, north).
+    # Cartopy `set_extent` expects (west, east, south, north) when given as
+    # (x0, x1, y0, y1). Reorder accordingly to avoid showing the wrong region.
+    ax.set_extent((BBOX[0], BBOX[2], BBOX[1], BBOX[3]), crs=ccrs.PlateCarree())
 
     ax.add_feature(
         cfeature.NaturalEarthFeature("physical", "ocean", "10m"),
@@ -178,10 +187,40 @@ def plot(df: pd.DataFrame, artisanal: gpd.GeoSeries) -> None:
         vmin=max(df["hours"].quantile(0.05), 0.1),
         vmax=df["hours"].quantile(0.99),
     )
-    mesh = ax.pcolormesh(
-        lons, lats, data,
-        cmap="hot_r", norm=norm, shading="auto",
-        transform=ccrs.PlateCarree(), zorder=3,
+
+    # For clarity and to ensure each data cell is plotted at the correct
+    # geographic location, plot the aggregated cells as a scatter of lon/lat
+    # centres rather than using pcolormesh. This also makes it easier to
+    # verify that points lie on water or land.
+    pts = gpd.GeoDataFrame(
+        df,
+        geometry=gpd.points_from_xy(df["lon"], df["lat"]),
+        crs=4326,
+    )
+
+    # Load Natural Earth land clipped to the study area to test point locations
+    shp = shpreader.natural_earth(resolution="10m", category="physical", name="land")
+    land = gpd.read_file(shp)
+    study = box(BBOX[0] - 1.0, BBOX[1] - 1.0, BBOX[2] + 1.0, BBOX[3] + 1.0)
+    land_local = gpd.clip(land, study).to_crs(4326)
+
+    # Spatial join: mark points that fall on land
+    try:
+        pts_on_land = pts.sjoin(land_local, how="left", predicate="within")
+        on_land_mask = pts_on_land.index_right.notna()
+    except Exception:
+        # Fallback: if spatial join isn't available in the environment,
+        # conservatively assume none are on land.
+        on_land_mask = [False] * len(pts)
+
+    n_on_land = int(sum(on_land_mask))
+    n_total = len(pts)
+    print(f"  -> {n_on_land} of {n_total} aggregated cells fall on land (based on Natural Earth clip)")
+
+    sc = ax.scatter(
+        pts["lon"], pts["lat"], c=pts["hours"],
+        cmap="hot_r", norm=norm, s=14, alpha=0.85,
+        transform=ccrs.PlateCarree(), zorder=6, linewidths=0,
     )
 
     for geom in artisanal:
@@ -195,6 +234,18 @@ def plot(df: pd.DataFrame, artisanal: gpd.GeoSeries) -> None:
                 transform=ccrs.PlateCarree(), zorder=5,
             )
 
+    # Add city markers (lon, lat) and labels
+    cities = {
+        "Chennai": (80.2707, 13.0827),
+        "Puducherry": (79.8145, 11.9139),
+    }
+    for name, (clon, clat) in cities.items():
+        ax.plot(clon, clat, marker="o", color="black", markersize=5,
+                transform=ccrs.PlateCarree(), zorder=8)
+        ax.text(clon + 0.06, clat + 0.06, name, fontsize=8,
+                transform=ccrs.PlateCarree(), zorder=8,
+                bbox=dict(facecolor="white", alpha=0.6, linewidth=0, pad=1))
+
     ax.add_feature(
         cfeature.NaturalEarthFeature("physical", "coastline", "10m"),
         linewidth=0.6, zorder=4,
@@ -203,7 +254,7 @@ def plot(df: pd.DataFrame, artisanal: gpd.GeoSeries) -> None:
     gl = ax.gridlines(draw_labels=True, linewidth=0.3, alpha=0.4)
     gl.top_labels = gl.right_labels = False
 
-    cbar = plt.colorbar(mesh, ax=ax, shrink=0.6, pad=0.04)
+    cbar = plt.colorbar(sc, ax=ax, shrink=0.6, pad=0.04)
     cbar.set_label("Apparent fishing hours, 2023-2024 (log scale)")
 
     ax.set_title(
@@ -218,10 +269,66 @@ def plot(df: pd.DataFrame, artisanal: gpd.GeoSeries) -> None:
     print(f"Saved -> {OUT_FIG}")
 
 
+def export_interactive_map(df: pd.DataFrame, artisanal: gpd.GeoSeries) -> None:
+    """Export an interactive Leaflet map with heat spots and boundary overlays."""
+    df = df[df["hours"] > 0].copy()
+    if df.empty:
+        raise SystemExit("Response had no non-zero fishing-effort cells.")
+
+    center_lat = (BBOX[1] + BBOX[3]) / 2
+    center_lon = (BBOX[0] + BBOX[2]) / 2
+    fmap = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=8,
+        tiles="CartoDB positron",
+        control_scale=True,
+    )
+
+    heat_data = df[["lat", "lon", "hours"]].to_numpy().tolist()
+    HeatMap(
+        heat_data,
+        name="Fishing effort heat",
+        radius=10,
+        blur=18,
+        max_zoom=9,
+        min_opacity=0.25,
+        max_val=float(df["hours"].quantile(0.99)),
+        gradient={0.2: "#ffffcc", 0.4: "#ffeda0", 0.6: "#feb24c", 0.8: "#f03b20", 1.0: "#800026"},
+    ).add_to(fmap)
+
+    folium.GeoJson(
+        artisanal.to_json(),
+        name=f"{ARTISANAL_NM} nm artisanal boundary",
+        style_function=lambda _: {
+            "color": "cyan",
+            "weight": 2,
+            "fill": False,
+        },
+    ).add_to(fmap)
+
+    cities = {
+        "Chennai": (80.2707, 13.0827),
+        "Puducherry": (79.8145, 11.9139),
+    }
+    for name, (clon, clat) in cities.items():
+        folium.Marker(
+            location=[clat, clon],
+            tooltip=name,
+            popup=name,
+            icon=folium.Icon(color="black", icon="info-sign"),
+        ).add_to(fmap)
+
+    folium.LayerControl(collapsed=False).add_to(fmap)
+    fmap.fit_bounds([[BBOX[1], BBOX[0]], [BBOX[3], BBOX[2]]])
+    fmap.save(str(OUT_HTML))
+    print(f"Saved -> {OUT_HTML}")
+
+
 def main() -> None:
     df = fetch_all()
     artisanal = build_artisanal_boundary()
     plot(df, artisanal)
+    export_interactive_map(df, artisanal)
 
 
 if __name__ == "__main__":

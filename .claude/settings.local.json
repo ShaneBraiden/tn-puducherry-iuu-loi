@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:globalfishingwatch.org)",
-      "Bash(python -m py_compile \"C:\\\\Shane\\\\GFW\\\\gfw_demo.py\")"
-    ]
-  }
-}
