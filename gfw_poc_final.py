@@ -46,11 +46,11 @@ BBOX = (79.549805, 11.800683, 80.566040, 13.285927)  # (W, S, E, N)
 # Sample window for PoC (monthly slices)
 START_MONTH = "2023-01"
 END_MONTH = "2024-12"
-BAN_MONTHS = {6, 7, 8}  # June-Aug mechanised-fishing ban (TNMFR Act context)
+BAN_MONTHS = {4, 5, 6}  # East coast mechanised fishing ban (Apr 15 - Jun 14)
 
 DATASET = "public-global-fishing-effort:latest"
 SPATIAL_RES = "HIGH"
-ARTISANAL_NM = 3
+ARTISANAL_NM = 5
 NM_TO_M = 1852
 
 OUT_DIR = Path(__file__).parent / "output"
@@ -427,7 +427,7 @@ def plot_dashboard(
 
     gl = ax_map.gridlines(draw_labels=True, linewidth=0.3, alpha=0.4)
     gl.top_labels = gl.right_labels = False
-    ax_map.set_title("AIS apparent fishing effort cells + 3 nm legal-zone overlay")
+    ax_map.set_title("AIS apparent fishing effort cells + 5 nm legal-zone overlay")
 
     cbar = plt.colorbar(sc, ax=ax_map, shrink=0.65, pad=0.03)
     cbar.set_label("Fishing hours (log scale)")
@@ -446,11 +446,15 @@ def plot_dashboard(
         color="#d7301f",
         linewidth=1.5,
     )
-    for _, row in monthly[monthly["is_ban_month"]].iterrows():
-        start = row["period_dt"]
-        end = start + pd.offsets.MonthEnd(1)
-        ax_month.axvspan(start, end, color="#fee391", alpha=0.25, linewidth=0)
-    ax_month.set_title("Monthly effort trend (yellow = June-Aug ban months)")
+    
+    # Exact dates for East Coast continuous ban: April 15 to June 14
+    years_in_data = monthly["period_dt"].dt.year.unique()
+    for y in years_in_data:
+        ban_start = pd.Timestamp(year=y, month=4, day=15)
+        ban_end = pd.Timestamp(year=y, month=6, day=14)
+        ax_month.axvspan(ban_start, ban_end, color="#fee391", alpha=0.25, linewidth=0)
+        
+    ax_month.set_title("Monthly effort trend (yellow = Apr 15 - Jun 14 ban)")
     ax_month.set_ylabel("Fishing hours")
     ax_month.grid(alpha=0.25, linestyle="--")
     ax_month.legend(frameon=False)
